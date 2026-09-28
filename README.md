@@ -1,33 +1,35 @@
 # Koulu – läksyt ja kokeet Wilmasta
 
-Sivu hakee Jyväskylän Wilmasta tunnin välein (n. klo 6–22) molempien lasten
+Sivu **https://tanelinieminen.github.io/koulu/** näyttää Venlan ja Väinön
 - **kaikki tulevat kokeet** (≤ 3 pv päässä olevat korostettuna)
 - **läksyt 3 viimeiseltä koulupäivältä** (ma–pe)
+- ison **"Päivitetty …"** -leiman (vihreä = tuore, oranssi = yli 3 h vanha)
 
-Sivu on salattu salasanalla. Lasten tietoja ei tallenneta repoon eikä tulosteta lokeihin.
+## Miten toimii
 
-## Käyttöönotto (kerran, n. 5 min)
+Wilma estää pilvipalvelimet, joten haku tehdään Macilta:
+`mac/paivita.sh` ajetaan automaattisesti tunnin välein klo 6–22 (macOS LaunchAgent).
+Se hakee tiedot, rakentaa salasanalla salatun sivun ja julkaisee sen `gh-pages`-haaraan.
+Kun Mac on kiinni tai unessa, sivu näyttää viimeisimmän haun; ajo tapahtuu heti kun kone herää.
 
-1. Luo GitHubiin uusi repo, esim. `koulu`, ja lataa nämä tiedostot sinne.
-2. **Settings → Secrets and variables → Actions → New repository secret**, lisää kolme:
-   - `WILMA_USER` – huoltajan Wilma-tunnus
-   - `WILMA_PASSWORD` – Wilma-salasana
-   - `SIVUN_SALASANA` – salasana, jolla lapset avaavat sivun
-3. **Settings → Pages → Source: GitHub Actions**
-4. **Actions → Päivitä koulusivu → Run workflow** (ensimmäinen ajo käsin).
-5. Sivu: `https://<käyttäjä>.github.io/koulu/`. Avaa se kerran omalla puhelimella
-   salasanalla ja ruksi "Muista minut".
-6. Sivun alareunaan ilmestyvät napit **Jaa suora linkki: Venla / Väinö**. Lähetä linkki
-   lapselle (esim. WhatsAppilla). Linkki avaa sivun suoraan ilman salasanaa ja oikealle
-   lapselle – lapsi lisää sen kotinäytölle. Linkki toimii kuin avain: älä jaa sitä muille.
-   Jos vaihdat `SIVUN_SALASANA`:n, vanhat linkit lakkaavat toimimasta.
+Tunnukset ovat vain Macin avainnipussa (Keychain), eivät GitHubissa. Lasten tietoja ei tallenneta repoon.
 
-## Hyvä tietää
+## Asennus (kerran)
 
-- Jos ajo epäonnistuu (esim. Wilman salasana vaihtui), GitHub lähettää sähköpostin
-  ja sivulla näkyy edellinen versio. Päivitysaika muuttuu oranssiksi, jos tieto on yli 14 h vanha.
-- Julkisessa repossa GitHub pysäyttää ajastuksen, jos repoon ei tule muutoksia 60 päivään
-  (tulee sähköposti, uudelleenkäynnistys yhdellä klikkauksella). Yksityisessä repossa ei tätä ongelmaa,
-  mutta Pages vaatii silloin GitHub Pro -tilin.
-- Läksypäivien määrää voi muuttaa: workflowiin `env: LAKSYPAIVAT: "5"`.
+```
+git clone https://github.com/tanelinieminen/koulu.git ~/koulu-asennus
+bash ~/koulu-asennus/mac/asenna.sh
+```
+Asennin kysyy Wilma-tunnuksen, Wilma-salasanan ja sivun salasanan, tekee testiajon ja laittaa ajastuksen päälle.
+
+Sen jälkeen: avaa sivu omalla puhelimella salasanalla, ruksi "Muista minut", ja lähetä sivun
+alareunan napeista **Jaa suora linkki: Venla / Väinö** linkit lapsille. Linkki toimii kuin avain.
+
+## Ylläpito
+
+- Loki: `~/Library/Logs/koulu.log`
+- Aja heti: `bash ~/Library/Application\ Support/koulu/repo/mac/paivita.sh --nyt`
+- Vaihda salasana: aja `asenna.sh` uudelleen (sivun salasanan vaihto mitätöi vanhat linkit)
+- Poista kaikki: `bash ~/Library/Application\ Support/koulu/repo/mac/poista.sh`
+- Läksypäivien määrä: `LAKSYPAIVAT` (oletus 3) `build_page.py`:ssä
 - Testaus ilman Wilmaa: `python test/testaa.py && python build_page.py test/data.json build/index.html`
