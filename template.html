@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#2f5d50">
+<title>Koulu</title>
+<style>
+:root{
+  --bg:#f6f5f1; --card:#ffffff; --text:#1d2321; --muted:#66706c; --line:#e3e1da;
+  --accent:#2f5d50; --accent-soft:#e3eee9; --warn:#b3541e; --warn-soft:#fbeadf;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#121614; --card:#1b201e; --text:#e8ebe9; --muted:#9aa39f; --line:#2b322f;
+    --accent:#8cc5b0; --accent-soft:#1f2e29; --warn:#f0a070; --warn-soft:#35241a;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  -webkit-text-size-adjust:100%}
+.wrap{max-width:640px;margin:0 auto;padding:16px 16px 48px}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:12px}
+h1{font-size:22px;margin:0}
+.updated{font-size:13px;color:var(--muted)}
+.updated.stale{color:var(--warn);font-weight:600}
+.tabs{display:flex;gap:8px;margin:0 0 20px;overflow-x:auto}
+.tabs button{flex:1;min-width:0;padding:10px 12px;border-radius:999px;border:1px solid var(--line);
+  background:var(--card);color:var(--text);font:inherit;font-weight:600;cursor:pointer;white-space:nowrap}
+.tabs button[aria-selected=true]{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:24px 0 8px}
+.item{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px}
+.item.soon{border-color:var(--warn);background:var(--warn-soft)}
+.row{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.subj{font-weight:700}
+.when{font-size:14px;color:var(--muted);white-space:nowrap}
+.soon .when{color:var(--warn);font-weight:700}
+.title{margin-top:2px}
+.topic{margin-top:6px;color:var(--muted);white-space:pre-line;font-size:15px}
+.day{font-weight:700;margin:16px 0 6px;font-size:15px}
+.day:first-of-type{margin-top:0}
+.hw{white-space:pre-line;margin-top:2px}
+.empty{color:var(--muted);padding:8px 0}
+footer{margin-top:32px;font-size:13px;color:var(--muted)}
+.share{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px}
+.share button{font:inherit;font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--muted);cursor:pointer}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>Koulu</h1><span class="updated" id="updated"></span></header>
+  <nav class="tabs" id="tabs" role="tablist"></nav>
+  <main id="main"></main>
+  <footer>Tiedot haetaan Wilmasta automaattisesti tunnin välein. Jos jotain puuttuu, tarkista Wilmasta.
+    <div class="share" id="share"></div></footer>
+</div>
+<script>
+const DATA = __DATA__;
+const WD = ["su","ma","ti","ke","to","pe","la"];
+const WDL = ["sunnuntai","maanantai","tiistai","keskiviikko","torstai","perjantai","lauantai"];
+
+function localToday(){ const n=new Date(); return new Date(n.getFullYear(),n.getMonth(),n.getDate()); }
+function parse(iso){ const [y,m,d]=iso.split("-").map(Number); return new Date(y,m-1,d); }
+function diffDays(iso){ return Math.round((parse(iso)-localToday())/86400000); }
+function short(iso){ const d=parse(iso); return `${WD[d.getDay()]} ${d.getDate()}.${d.getMonth()+1}.`; }
+function esc(s){ return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function examWhen(iso){
+  const n=diffDays(iso);
+  if(n===0) return "tänään";
+  if(n===1) return "huomenna";
+  if(n<7) return `${WDL[parse(iso).getDay()]} (${n} pv)`;
+  return `${short(iso)} (${n} pv)`;
+}
+function hwDay(iso){
+  const n=diffDays(iso);
+  if(n===0) return "Tänään annetut";
+  if(n===-1) return "Eilen annetut";
+  if(n>0) return `${short(iso)} (tuleva)`;
+  const d=parse(iso); return `${WDL[d.getDay()][0].toUpperCase()+WDL[d.getDay()].slice(1)} ${d.getDate()}.${d.getMonth()+1}.`;
+}
+
+function render(i){
+  const k=DATA.kids[i];
+  const exams=k.exams.filter(e=>diffDays(e.date)>=0);
+  let h=`<h2>Tulevat kokeet (${exams.length})</h2>`;
+  if(!exams.length) h+=`<div class="empty">Ei tulevia kokeita.</div>`;
+  for(const e of exams){
+    const soon=diffDays(e.date)<=3;
+    h+=`<div class="item${soon?" soon":""}"><div class="row"><span class="subj">${esc(e.subject)}</span><span class="when">${examWhen(e.date)}</span></div>`
+      +(e.title&&e.title!==e.subject?`<div class="title">${esc(e.title)}</div>`:"")
+      +(e.topic?`<div class="topic">${esc(e.topic)}</div>`:"")+`</div>`;
+  }
+  h+=`<h2>Läksyt – 3 viimeistä koulupäivää (${k.homework.length})</h2>`;
+  if(!k.homework.length) h+=`<div class="empty">Ei merkittyjä läksyjä.</div>`;
+  let cur=null;
+  for(const x of k.homework){
+    if(x.date!==cur){ cur=x.date; h+=`<div class="day">${hwDay(x.date)}</div>`; }
+    h+=`<div class="item"><div class="subj">${esc(x.subject)}</div><div class="hw">${esc(x.text)}</div></div>`;
+  }
+  document.getElementById("main").innerHTML=h;
+  document.querySelectorAll("#tabs button").forEach((b,j)=>b.setAttribute("aria-selected",j===i));
+  try{ localStorage.setItem("koulu-lapsi",String(i)); }catch(e){}
+}
+
+// Suorat linkit ilman salasanaa: linkki sisältää salasanan tiivisteen (staticrypt)
+function shareButtons(names){
+  let hash=null; try{ hash=localStorage.getItem("staticrypt_passphrase"); }catch(e){}
+  if(!hash){ const m=location.hash.match(/staticrypt_pwd=([^&]*)/); if(m) hash=m[1]; }
+  if(!hash) return;
+  const box=document.getElementById("share"), base=location.origin+location.pathname;
+  names.forEach(n=>{
+    const b=document.createElement("button");
+    b.textContent=`Jaa suora linkki: ${n}`;
+    b.onclick=async()=>{
+      const url=`${base}?lapsi=${encodeURIComponent(n.toLowerCase())}#staticrypt_pwd=${hash}&remember_me`;
+      try{ if(navigator.share){ await navigator.share({title:"Koulu",url}); return; } }catch(e){ return; }
+      try{ await navigator.clipboard.writeText(url); b.textContent="Linkki kopioitu ✓"; }catch(e){ prompt("Kopioi linkki:",url); }
+    };
+    box.appendChild(b);
+  });
+}
+
+(function init(){
+  const tabs=document.getElementById("tabs");
+  if(DATA.kids.length<2) tabs.style.display="none";
+  // Näytetään se nimen osa, joka erottaa lapset (Wilma voi antaa "Sukunimi Etunimi")
+  const words=DATA.kids.map(k=>k.name.trim().split(/\s+/));
+  let wi=0; while(words.length>1 && wi<5 && new Set(words.map(w=>w[wi])).size<words.length) wi++;
+  DATA.kids.forEach((k,i)=>{
+    const b=document.createElement("button"); b.role="tab"; b.textContent=words[i][wi]||k.name;
+    b.onclick=()=>render(i); tabs.appendChild(b);
+  });
+  const u=new Date(DATA.updated), el=document.getElementById("updated");
+  el.textContent=`Päivitetty ${u.getDate()}.${u.getMonth()+1}. klo ${String(u.getHours()).padStart(2,"0")}.${String(u.getMinutes()).padStart(2,"0")}`;
+  if(Date.now()-u.getTime()>1000*60*60*14) el.classList.add("stale");
+  let s=0; try{ s=Number(localStorage.getItem("koulu-lapsi"))||0; }catch(e){}
+  // ?lapsi=venla (nimen osa) tai ?lapsi=0
+  const q=(new URLSearchParams(location.search).get("lapsi")||"").toLowerCase();
+  if(q){ const j=DATA.kids.findIndex(k=>k.name.toLowerCase().split(/\s+/).includes(q)); s=j>=0?j:(Number(q)||0); }
+  render(Math.min(s,DATA.kids.length-1));
+  // staticrypt tallentaa tiivisteen vasta purun jälkeen, joten odotetaan hetki
+  setTimeout(()=>shareButtons(words.map(w=>w[wi])),600);
+})();
+</script>
+</body>
+</html>
