@@ -24,8 +24,11 @@ body{margin:0;background:var(--bg);color:var(--text);
 .wrap{max-width:640px;margin:0 auto;padding:16px 16px 48px}
 header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:12px}
 h1{font-size:22px;margin:0}
-.updated{font-size:13px;color:var(--muted)}
-.updated.stale{color:var(--warn);font-weight:600}
+.status{border-radius:12px;padding:12px 14px;margin:0 0 16px;background:var(--accent-soft);border:1px solid var(--accent)}
+.status-main{font-size:20px;font-weight:700;color:var(--accent)}
+.status-sub{font-size:14px;color:var(--muted);margin-top:2px}
+.status.old{background:var(--warn-soft);border-color:var(--warn)}
+.status.old .status-main{color:var(--warn)}
 .tabs{display:flex;gap:8px;margin:0 0 20px;overflow-x:auto}
 .tabs button{flex:1;min-width:0;padding:10px 12px;border-radius:999px;border:1px solid var(--line);
   background:var(--card);color:var(--text);font:inherit;font-weight:600;cursor:pointer;white-space:nowrap}
@@ -50,10 +53,11 @@ footer{margin-top:32px;font-size:13px;color:var(--muted)}
 </head>
 <body>
 <div class="wrap">
-  <header><h1>Koulu</h1><span class="updated" id="updated"></span></header>
+  <header><h1>Koulu</h1></header>
+  <div class="status" id="status"><div class="status-main" id="updated"></div><div class="status-sub" id="updated-sub"></div></div>
   <nav class="tabs" id="tabs" role="tablist"></nav>
   <main id="main"></main>
-  <footer>Tiedot haetaan Wilmasta automaattisesti tunnin välein. Jos jotain puuttuu, tarkista Wilmasta.
+  <footer>Tiedot haetaan Wilmasta automaattisesti tunnin välein klo 6–22. Jos jotain puuttuu, tarkista Wilmasta.
     <div class="share" id="share"></div></footer>
 </div>
 <script>
@@ -133,9 +137,15 @@ function shareButtons(names){
     const b=document.createElement("button"); b.role="tab"; b.textContent=words[i][wi]||k.name;
     b.onclick=()=>render(i); tabs.appendChild(b);
   });
-  const u=new Date(DATA.updated), el=document.getElementById("updated");
-  el.textContent=`Päivitetty ${u.getDate()}.${u.getMonth()+1}. klo ${String(u.getHours()).padStart(2,"0")}.${String(u.getMinutes()).padStart(2,"0")}`;
-  if(Date.now()-u.getTime()>1000*60*60*14) el.classList.add("stale");
+  // Iso päivitysleima: vihreä = tuore, oranssi = yli 3 h vanha
+  const u=new Date(DATA.updated), hh=String(u.getHours()).padStart(2,"0"), mm=String(u.getMinutes()).padStart(2,"0");
+  const dd=Math.round((localToday()-new Date(u.getFullYear(),u.getMonth(),u.getDate()))/86400000);
+  const day=dd===0?"tänään":dd===1?"eilen":`${WDL[u.getDay()]} ${u.getDate()}.${u.getMonth()+1}.`;
+  document.getElementById("updated").textContent=`Päivitetty ${day} klo ${hh}.${mm}`;
+  const ageH=(Date.now()-u.getTime())/3600000;
+  const ago=ageH<1?`${Math.max(1,Math.round(ageH*60))} min sitten`:ageH<48?`${Math.round(ageH)} h sitten`:`${Math.round(ageH/24)} pv sitten`;
+  document.getElementById("updated-sub").textContent=ageH>3?`${ago} – uusimmat merkinnät voivat puuttua, tarkista tarvittaessa Wilmasta`:ago;
+  if(ageH>3) document.getElementById("status").classList.add("old");
   let s=0; try{ s=Number(localStorage.getItem("koulu-lapsi"))||0; }catch(e){}
   // ?lapsi=venla (nimen osa) tai ?lapsi=0
   const q=(new URLSearchParams(location.search).get("lapsi")||"").toLowerCase();
