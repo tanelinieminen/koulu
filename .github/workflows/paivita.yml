@@ -1,0 +1,67 @@
+name: Päivitä koulusivu
+
+on:
+  schedule:
+    # Tunnin välein klo ~6–22 Suomen aikaa (GitHub käyttää UTC-aikaa)
+    - cron: "7 3-19 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  paivita:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Asenna riippuvuudet
+        run: pip install -q requests beautifulsoup4
+
+      - name: Hae tiedot Wilmasta
+        env:
+          WILMA_URL: https://jyvaskyla.inschool.fi
+          WILMA_USER: ${{ secrets.WILMA_USER }}
+          WILMA_PASSWORD: ${{ secrets.WILMA_PASSWORD }}
+        run: python wilma.py data.json
+
+      - name: Rakenna sivu
+        run: python build_page.py data.json build/index.html
+
+      - name: Salaa sivu salasanalla
+        env:
+          SIVUN_SALASANA: ${{ secrets.SIVUN_SALASANA }}
+        run: |
+          SALT=$(python -c "import hashlib,os;print(hashlib.sha256(('koulu-'+os.environ['SIVUN_SALASANA']).encode()).hexdigest()[:32])")
+          npx --yes staticrypt@3 build/index.html -p "$SIVUN_SALASANA" -s "$SALT" -d site \
+            --short --remember 365 --config false \
+            --template-title "Koulu" \
+            --template-instructions "Syötä perheen salasana" \
+            --template-placeholder "Salasana" \
+            --template-button "Avaa" \
+            --template-remember "Muista minut tällä laitteella" \
+            --template-error "Väärä salasana" \
+            --template-color-primary "#2f5d50" \
+            --template-color-secondary "#f6f5f1"
+          rm -rf build data.json
+          touch site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
