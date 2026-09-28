@@ -73,7 +73,12 @@ class Wilma:
             t = self.s.get(self.base + "/token", timeout=30)
             m = re.search(r'"Wilma2LoginID"\s*:\s*"([^"\s]+)"', t.text)
             if not m:
-                raise WilmaError("Kirjautumistunnistetta (SESSIONID) ei saatu")
+                title = re.search(r"<title>(.*?)</title>", r.text, re.S | re.I)
+                raise WilmaError(
+                    "Kirjautumistunnistetta (SESSIONID) ei saatu – "
+                    f"/login HTTP {r.status_code} ({r.headers.get('server', '?')}, "
+                    f"otsikko: {title[1].strip()[:60] if title else '-'}), /token HTTP {t.status_code}"
+                )
             fields["SESSIONID"] = m[1]
 
         fields.update({"Login": username, "Password": password})
