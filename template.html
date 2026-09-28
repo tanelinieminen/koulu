@@ -48,6 +48,11 @@ h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute
 .day{font-weight:700;margin:16px 0 6px;font-size:15px}
 .day:first-of-type{margin-top:0}
 .hw{white-space:pre-line;margin-top:2px}
+.hwrow{display:flex;gap:12px;align-items:flex-start;cursor:pointer}
+.check{flex:none;width:28px;height:28px;border-radius:8px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--bg);margin-top:2px}
+.item.done{opacity:.55}
+.item.done .check{background:var(--accent);border-color:var(--accent)}
+.item.done .hw{text-decoration:line-through}
 .empty{color:var(--muted);padding:8px 0}
 footer{margin-top:32px;font-size:13px;color:var(--muted)}
 .share{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px}
@@ -94,12 +99,17 @@ function hwDay(iso){
 }
 
 let VIEW="kokeet", KID=0;
+// Tehdyt läksyt muistetaan tällä laitteella (lapsen oma puhelin)
+function hwKey(x){ let h=0; const t=x.date+"|"+x.subject+"|"+x.text; for(let i=0;i<t.length;i++) h=(h*31+t.charCodeAt(i))|0; return "koulu-tehty-"+h; }
+function isDone(x){ try{ return localStorage.getItem(hwKey(x))==="1"; }catch(e){ return false; } }
+function toggleDone(x){ try{ isDone(x)?localStorage.removeItem(hwKey(x)):localStorage.setItem(hwKey(x),"1"); }catch(e){} render(); }
 function render(i){
   if(i!==undefined) KID=i;
   const k=DATA.kids[KID];
   const exams=k.exams.filter(e=>diffDays(e.date)>=0);
   document.getElementById("seg-kokeet").textContent=`Kokeet (${exams.length})`;
-  document.getElementById("seg-laksyt").textContent=`Läksyt (${k.homework.length})`;
+  const open=k.homework.filter(x=>!isDone(x)).length;
+  document.getElementById("seg-laksyt").textContent=open?`Läksyt (${open})`:`Läksyt ✓`;
   let h="";
   if(VIEW==="kokeet"){
     if(!exams.length) h+=`<div class="empty">Ei tulevia kokeita.</div>`;
@@ -113,12 +123,15 @@ function render(i){
     h+=`<h2>3 viimeistä koulupäivää</h2>`;
     if(!k.homework.length) h+=`<div class="empty">Ei merkittyjä läksyjä.</div>`;
     let cur=null;
-    for(const x of k.homework){
+    k.homework.forEach((x,j)=>{
       if(x.date!==cur){ cur=x.date; h+=`<div class="day">${hwDay(x.date)}</div>`; }
-      h+=`<div class="item"><div class="subj">${esc(x.subject)}</div><div class="hw">${esc(x.text)}</div></div>`;
-    }
+      const d=isDone(x);
+      h+=`<div class="item${d?" done":""}" data-hw="${j}" role="checkbox" aria-checked="${d}"><div class="hwrow"><span class="check">${d?"✓":""}</span><div><div class="subj">${esc(x.subject)}</div><div class="hw">${esc(x.text)}</div></div></div></div>`;
+    });
+    if(k.homework.length) h+=`<div class="empty">Napauta läksyä, kun se on tehty.</div>`;
   }
   document.getElementById("main").innerHTML=h;
+  document.querySelectorAll("[data-hw]").forEach(el=>el.onclick=()=>toggleDone(k.homework[+el.dataset.hw]));
   document.querySelectorAll("#tabs button").forEach((b,j)=>b.setAttribute("aria-selected",j===KID));
   document.querySelectorAll("#seg button").forEach(b=>b.setAttribute("aria-selected",b.dataset.v===VIEW));
   try{ localStorage.setItem("koulu-lapsi",String(KID)); localStorage.setItem("koulu-nakyma",VIEW); }catch(e){}
