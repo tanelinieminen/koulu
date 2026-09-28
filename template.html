@@ -33,6 +33,9 @@ h1{font-size:22px;margin:0}
 .tabs button{flex:1;min-width:0;padding:10px 12px;border-radius:999px;border:1px solid var(--line);
   background:var(--card);color:var(--text);font:inherit;font-weight:600;cursor:pointer;white-space:nowrap}
 .tabs button[aria-selected=true]{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px;margin:0 0 16px}
+.seg button{flex:1;padding:10px 8px;border:0;border-radius:9px;background:transparent;color:var(--muted);font:inherit;font-weight:700;cursor:pointer}
+.seg button[aria-selected=true]{background:var(--accent-soft);color:var(--accent)}
 h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:24px 0 8px}
 .item{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px}
 .item.soon{border-color:var(--warn);background:var(--warn-soft)}
@@ -56,6 +59,10 @@ footer{margin-top:32px;font-size:13px;color:var(--muted)}
   <header><h1>Koulu</h1></header>
   <div class="status" id="status"><div class="status-main" id="updated"></div><div class="status-sub" id="updated-sub"></div></div>
   <nav class="tabs" id="tabs" role="tablist"></nav>
+  <nav class="seg" id="seg" role="tablist">
+    <button role="tab" data-v="kokeet" id="seg-kokeet">Kokeet</button>
+    <button role="tab" data-v="laksyt" id="seg-laksyt">Läksyt</button>
+  </nav>
   <main id="main"></main>
   <footer>Tiedot haetaan Wilmasta automaattisesti tunnin välein klo 6–22. Jos jotain puuttuu, tarkista Wilmasta.
     <div class="share" id="share"></div></footer>
@@ -86,27 +93,35 @@ function hwDay(iso){
   const d=parse(iso); return `${WDL[d.getDay()][0].toUpperCase()+WDL[d.getDay()].slice(1)} ${d.getDate()}.${d.getMonth()+1}.`;
 }
 
+let VIEW="kokeet", KID=0;
 function render(i){
-  const k=DATA.kids[i];
+  if(i!==undefined) KID=i;
+  const k=DATA.kids[KID];
   const exams=k.exams.filter(e=>diffDays(e.date)>=0);
-  let h=`<h2>Tulevat kokeet (${exams.length})</h2>`;
-  if(!exams.length) h+=`<div class="empty">Ei tulevia kokeita.</div>`;
-  for(const e of exams){
-    const soon=diffDays(e.date)<=3;
-    h+=`<div class="item${soon?" soon":""}"><div class="row"><span class="subj">${esc(e.subject)}</span><span class="when">${examWhen(e.date)}</span></div>`
-      +(e.title&&e.title!==e.subject?`<div class="title">${esc(e.title)}</div>`:"")
-      +(e.topic?`<div class="topic">${esc(e.topic)}</div>`:"")+`</div>`;
-  }
-  h+=`<h2>Läksyt – 3 viimeistä koulupäivää (${k.homework.length})</h2>`;
-  if(!k.homework.length) h+=`<div class="empty">Ei merkittyjä läksyjä.</div>`;
-  let cur=null;
-  for(const x of k.homework){
-    if(x.date!==cur){ cur=x.date; h+=`<div class="day">${hwDay(x.date)}</div>`; }
-    h+=`<div class="item"><div class="subj">${esc(x.subject)}</div><div class="hw">${esc(x.text)}</div></div>`;
+  document.getElementById("seg-kokeet").textContent=`Kokeet (${exams.length})`;
+  document.getElementById("seg-laksyt").textContent=`Läksyt (${k.homework.length})`;
+  let h="";
+  if(VIEW==="kokeet"){
+    if(!exams.length) h+=`<div class="empty">Ei tulevia kokeita.</div>`;
+    for(const e of exams){
+      const soon=diffDays(e.date)<=3;
+      h+=`<div class="item${soon?" soon":""}"><div class="row"><span class="subj">${esc(e.subject)}</span><span class="when">${examWhen(e.date)}</span></div>`
+        +(e.title&&e.title!==e.subject?`<div class="title">${esc(e.title)}</div>`:"")
+        +(e.topic?`<div class="topic">${esc(e.topic)}</div>`:"")+`</div>`;
+    }
+  } else {
+    h+=`<h2>3 viimeistä koulupäivää</h2>`;
+    if(!k.homework.length) h+=`<div class="empty">Ei merkittyjä läksyjä.</div>`;
+    let cur=null;
+    for(const x of k.homework){
+      if(x.date!==cur){ cur=x.date; h+=`<div class="day">${hwDay(x.date)}</div>`; }
+      h+=`<div class="item"><div class="subj">${esc(x.subject)}</div><div class="hw">${esc(x.text)}</div></div>`;
+    }
   }
   document.getElementById("main").innerHTML=h;
-  document.querySelectorAll("#tabs button").forEach((b,j)=>b.setAttribute("aria-selected",j===i));
-  try{ localStorage.setItem("koulu-lapsi",String(i)); }catch(e){}
+  document.querySelectorAll("#tabs button").forEach((b,j)=>b.setAttribute("aria-selected",j===KID));
+  document.querySelectorAll("#seg button").forEach(b=>b.setAttribute("aria-selected",b.dataset.v===VIEW));
+  try{ localStorage.setItem("koulu-lapsi",String(KID)); localStorage.setItem("koulu-nakyma",VIEW); }catch(e){}
 }
 
 // Suorat linkit ilman salasanaa: linkki sisältää salasanan tiivisteen (staticrypt)
@@ -146,7 +161,8 @@ function shareButtons(names){
   const ago=ageH<1?`${Math.max(1,Math.round(ageH*60))} min sitten`:ageH<48?`${Math.round(ageH)} h sitten`:`${Math.round(ageH/24)} pv sitten`;
   document.getElementById("updated-sub").textContent=ageH>3?`${ago} – uusimmat merkinnät voivat puuttua, tarkista tarvittaessa Wilmasta`:ago;
   if(ageH>3) document.getElementById("status").classList.add("old");
-  let s=0; try{ s=Number(localStorage.getItem("koulu-lapsi"))||0; }catch(e){}
+  document.querySelectorAll("#seg button").forEach(b=>b.onclick=()=>{ VIEW=b.dataset.v; render(); window.scrollTo(0,0); });
+  let s=0; try{ s=Number(localStorage.getItem("koulu-lapsi"))||0; VIEW=localStorage.getItem("koulu-nakyma")==="laksyt"?"laksyt":"kokeet"; }catch(e){}
   // ?lapsi=venla (nimen osa) tai ?lapsi=0
   const q=(new URLSearchParams(location.search).get("lapsi")||"").toLowerCase();
   if(q){ const j=DATA.kids.findIndex(k=>k.name.toLowerCase().split(/\s+/).includes(q)); s=j>=0?j:(Number(q)||0); }
