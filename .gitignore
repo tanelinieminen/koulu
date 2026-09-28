@@ -1,0 +1,5 @@
+data.json
+build/
+site/
+__pycache__/
+test/data.json
