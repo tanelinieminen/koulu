@@ -120,7 +120,7 @@ function render(i){
         +(e.topic?`<div class="topic">${esc(e.topic)}</div>`:"")+`</div>`;
     }
   } else {
-    h+=`<h2>3 viimeistä koulupäivää</h2>`;
+    h+=`<h2>${DATA.days||5} viimeistä koulupäivää</h2>`;
     if(!k.homework.length) h+=`<div class="empty">Ei merkittyjä läksyjä.</div>`;
     let cur=null;
     k.homework.forEach((x,j)=>{
