@@ -8,9 +8,9 @@ Sivu **https://tanelinieminen.github.io/koulu/** näyttää Venlan ja Väinön
 ## Miten toimii
 
 Wilma estää pilvipalvelimet, joten haku tehdään Macilta:
-`mac/paivita.sh` ajetaan automaattisesti tunnin välein klo 6–22 (macOS LaunchAgent).
+`mac/paivita.sh` ajetaan automaattisesti joka tunti klo x.05, klo 6–22 (macOS LaunchAgent).
 Se hakee tiedot, rakentaa salasanalla salatun sivun ja julkaisee sen `gh-pages`-haaraan.
-Kun Mac on kiinni tai unessa, sivu näyttää viimeisimmän haun; ajo tapahtuu heti kun kone herää.
+Kun Mac on kiinni tai unessa, sivu näyttää viimeisimmän haun; väliin jäänyt ajo tehdään heti kun kone herää.
 
 Tunnukset ovat vain Macin avainnipussa (Keychain), eivät GitHubissa. Lasten tietoja ei tallenneta repoon.
 
