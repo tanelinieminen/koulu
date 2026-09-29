@@ -2,7 +2,7 @@
 
 Säännöt:
   - Kokeet: kaikki tästä päivästä eteenpäin.
-  - Läksyt: 3 viimeisen koulupäivän (ma–pe) aikana annetut + mahdolliset tulevat.
+  - Läksyt: 5 viimeisen koulupäivän (ma–pe) aikana annetut + mahdolliset tulevat.
 """
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("Europe/Helsinki")
-SCHOOL_DAYS = int(os.environ.get("LAKSYPAIVAT", "3"))
+SCHOOL_DAYS = int(os.environ.get("LAKSYPAIVAT", "5"))
 
 
 def homework_cutoff(today: date, n: int) -> date:
@@ -35,7 +35,7 @@ def build(data: dict, now: datetime) -> str:
         exams = sorted((e for e in c["exams"] if e["date"] >= t), key=lambda e: (e["date"], e["subject"]))
         hw = sorted((h for h in c["homework"] if h["date"] >= cutoff), key=lambda h: (h["date"], h["subject"]), reverse=True)
         kids.append({"name": c["name"], "exams": exams, "homework": hw})
-    payload = {"updated": now.isoformat(timespec="minutes"), "cutoff": cutoff, "kids": kids}
+    payload = {"updated": now.isoformat(timespec="minutes"), "cutoff": cutoff, "days": SCHOOL_DAYS, "kids": kids}
     tpl = open(os.path.join(os.path.dirname(__file__), "template.html"), encoding="utf-8").read()
     blob = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
     return tpl.replace("__DATA__", blob)
