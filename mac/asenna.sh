@@ -36,8 +36,8 @@ tallenna WILMA_PASSWORD "Wilma-salasana"
 tallenna SIVUN_SALASANA "Sivun salasana (lapset avaavat sivun tällä)"
 
 echo "4/5 Testiajo (haku Wilmasta + julkaisu)"
-chmod +x "$REPO/mac/paivita.sh"
-if "$REPO/mac/paivita.sh" --nyt; then
+git -C "$REPO" config core.fileMode false
+if bash "$REPO/mac/paivita.sh" --nyt; then
   tail -n 5 "$HOME/Library/Logs/koulu.log"
 else
   echo "Testiajo epäonnistui. Loki:"; tail -n 20 "$HOME/Library/Logs/koulu.log"; exit 1
