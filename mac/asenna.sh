@@ -43,18 +43,6 @@ else
   echo "Testiajo epäonnistui. Loki:"; tail -n 20 "$HOME/Library/Logs/koulu.log"; exit 1
 fi
 
-echo "5/5 Ajastus: tunnin välein, käynnistyy automaattisesti kirjautuessa ja herätessä"
-cat >"$PLIST" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-  <key>Label</key><string>fi.koulu.paivita</string>
-  <key>ProgramArguments</key><array><string>/bin/bash</string><string>$REPO/mac/paivita.sh</string></array>
-  <key>StartInterval</key><integer>3600</integer>
-  <key>RunAtLoad</key><true/>
-  <key>StandardErrorPath</key><string>$HOME/Library/Logs/koulu.log</string>
-</dict></plist>
-EOF
-launchctl bootout "gui/$(id -u)/fi.koulu.paivita" 2>/dev/null || true
-launchctl bootstrap "gui/$(id -u)" "$PLIST"
+echo "5/5 Ajastus"
+bash "$REPO/mac/ajastus.sh"
 echo "Valmis. Sivu: https://tanelinieminen.github.io/koulu/  – loki: ~/Library/Logs/koulu.log"
