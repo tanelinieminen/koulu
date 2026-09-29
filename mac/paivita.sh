@@ -51,3 +51,9 @@ git add -A
 git -c user.name="koulu-bot" -c user.email="koulu-bot@users.noreply.github.com" commit -q -m "Päivitys $(date '+%Y-%m-%d %H:%M')"
 git push -q -f "$(git -C "$REPO" remote get-url origin)" gh-pages
 echo "Julkaistu."
+
+# Kertaluontoinen päivitys vanhasta ajastuksesta uuteen (kalenteriajastus, toimii myös unen jälkeen)
+if [ -f "$HOME/Library/LaunchAgents/fi.koulu.paivita.plist" ]; then
+  echo "Päivitetään ajastus uuteen muotoon."
+  bash "$REPO/mac/ajastus.sh"
+fi
