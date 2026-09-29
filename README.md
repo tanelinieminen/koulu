@@ -2,7 +2,7 @@
 
 Sivu **https://tanelinieminen.github.io/koulu/** näyttää Venlan ja Väinön
 - **kaikki tulevat kokeet** (≤ 3 pv päässä olevat korostettuna)
-- **läksyt 3 viimeiseltä koulupäivältä** (ma–pe)
+- **läksyt 5 viimeiseltä koulupäivältä** (ma–pe)
 - ison **"Päivitetty …"** -leiman (vihreä = tuore, oranssi = yli 3 h vanha)
 
 ## Miten toimii
@@ -31,5 +31,5 @@ alareunan napeista **Jaa suora linkki: Venla / Väinö** linkit lapsille. Linkki
 - Aja heti: `bash ~/Library/Application\ Support/koulu/repo/mac/paivita.sh --nyt`
 - Vaihda salasana: aja `asenna.sh` uudelleen (sivun salasanan vaihto mitätöi vanhat linkit)
 - Poista kaikki: `bash ~/Library/Application\ Support/koulu/repo/mac/poista.sh`
-- Läksypäivien määrä: `LAKSYPAIVAT` (oletus 3) `build_page.py`:ssä
+- Läksypäivien määrä: `LAKSYPAIVAT` (oletus 5) `build_page.py`:ssä
 - Testaus ilman Wilmaa: `python test/testaa.py && python build_page.py test/data.json build/index.html`
