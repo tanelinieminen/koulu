@@ -59,6 +59,11 @@ h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute
 .form input,.form textarea{font:inherit;font-size:16px;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);width:100%}
 .form textarea{min-height:70px;resize:vertical}
 .form .btns{display:flex;gap:8px}
+.type{display:flex;gap:6px}
+.type label{flex:1;display:block;text-align:center;padding:9px;border:1px solid var(--line);border-radius:8px;font-size:15px;font-weight:700;color:var(--muted);cursor:pointer}
+.type input{display:none}
+.type input:checked+span{color:var(--accent)}
+.type label:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
 .form .btns button{flex:1;padding:10px;border-radius:8px;font:inherit;font-weight:700;cursor:pointer;border:1px solid var(--accent)}
 .form .save{background:var(--accent);color:var(--bg)}
 .form .cancel{background:transparent;color:var(--accent)}
@@ -122,74 +127,77 @@ function kidKey(){ return (DATA.kids[KID]||{}).name||String(KID); }
 function loadOwn(){ try{ return JSON.parse(localStorage.getItem("koulu-omat")||"[]"); }catch(e){ return []; } }
 function saveOwn(a){ try{ localStorage.setItem("koulu-omat",JSON.stringify(a)); }catch(e){} }
 function ownForKid(){
-  // tehdyt omat tehtävät katoavat viikon kuluttua määräpäivästä
-  const all=loadOwn(), keep=all.filter(o=>!(isDone(o)&&diffDays(o.date)<-7));
+  // vanhat omat merkinnät siivotaan pois kuukauden jälkeen
+  const all=loadOwn(), keep=all.filter(o=>diffDays(o.date)>=-31);
   if(keep.length!==all.length) saveOwn(keep);
-  return keep.filter(o=>o.kid===kidKey()).sort((a,b)=>a.date.localeCompare(b.date));
+  return keep.filter(o=>o.kid===kidKey()).map(o=>Object.assign({type:"laksy"},o));
 }
 function isoOf(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
-function dueText(iso){ const n=diffDays(iso); if(n<0) return `Myöhässä (${short(iso)})`; if(n===0) return "Tänään"; if(n===1) return "Huomiseksi"; return `${short(iso)} mennessä`; }
+const OMA=`<span class="badge">oma</span>`;
+function delBtn(o){ return `<button class="del" data-del="${o.id}">Poista</button>`; }
 
 function render(i){
   if(i!==undefined) KID=i;
   const k=DATA.kids[KID];
-  const exams=k.exams.filter(e=>diffDays(e.date)>=0);
-  document.getElementById("seg-kokeet").textContent=`Kokeet (${exams.length})`;
   const own=ownForKid();
-  const open=k.homework.filter(x=>!isDone(x)).length+own.filter(o=>!isDone(o)).length;
+  const ownExams=own.filter(o=>o.type==="koe").map(o=>({date:o.date,subject:o.subject,title:"",topic:o.text,own:o}));
+  const exams=k.exams.concat(ownExams).filter(e=>diffDays(e.date)>=0).sort((a,b)=>a.date.localeCompare(b.date));
+  const ownHw=own.filter(o=>o.type!=="koe").map(o=>({date:o.date,subject:o.subject,text:o.text,own:o}));
+  const hws=k.homework.concat(ownHw.filter(x=>x.date>=DATA.cutoff)).sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById("seg-kokeet").textContent=`Kokeet (${exams.length})`;
+  const open=hws.filter(x=>!isDone(x)).length;
   document.getElementById("seg-laksyt").textContent=open?`Läksyt (${open})`:`Läksyt ✓`;
   let h="";
+  if(FORM){
+    const subs=[...new Set(DATA.kids.flatMap(kk=>kk.homework.map(x=>x.subject).concat(kk.exams.map(e=>e.subject))))].sort();
+    const koe=VIEW==="kokeet";
+    h+=`<form class="form" id="ownform">
+      <div class="type"><label><input type="radio" name="type" value="laksy" ${koe?"":"checked"}><span>Läksy</span></label><label><input type="radio" name="type" value="koe" ${koe?"checked":""}><span>Koe</span></label></div>
+      <label><span id="datelbl">${koe?"Koepäivä":"Päivä, jolloin läksy annettiin"}</span><input type="date" name="date" required value="${isoOf(new Date())}"></label>
+      <label>Aine<input name="subject" list="subs" required placeholder="esim. Matematiikka" autocomplete="off"></label>
+      <datalist id="subs">${subs.map(x=>`<option value="${esc(x)}">`).join("")}</datalist>
+      <label>Aihe<textarea name="text" required placeholder="${koe?"Mitä kokeeseen tulee?":"Mitä pitää tehdä?"}"></textarea></label>
+      <div class="btns"><button type="button" class="cancel" id="owncancel">Peru</button><button type="submit" class="save">Tallenna</button></div>
+    </form>`;
+  } else {
+    h+=`<button class="add-btn" id="addown">+ Lisää ${VIEW==="kokeet"?"koe":"läksy"} itse</button>`;
+  }
   if(VIEW==="kokeet"){
     if(!exams.length) h+=`<div class="empty">Ei tulevia kokeita.</div>`;
     for(const e of exams){
       const soon=diffDays(e.date)<=3;
-      h+=`<div class="item${soon?" soon":""}"><div class="row"><span class="subj">${esc(e.subject)}</span><span class="when">${examWhen(e.date)}</span></div>`
+      h+=`<div class="item${soon?" soon":""}"><div class="row"><span class="subj">${esc(e.subject)}${e.own?OMA:""}</span><span class="when">${examWhen(e.date)}</span></div>`
         +(e.title&&e.title!==e.subject?`<div class="title">${esc(e.title)}</div>`:"")
-        +(e.topic?`<div class="topic">${esc(e.topic)}</div>`:"")+`</div>`;
+        +(e.topic?`<div class="topic">${esc(e.topic)}</div>`:"")+(e.own?delBtn(e.own).replace('class="del"','class="del" style="margin-left:0"'):"")+`</div>`;
     }
   } else {
-    if(FORM){
-      const subs=[...new Set(DATA.kids.flatMap(kk=>kk.homework.map(x=>x.subject).concat(kk.exams.map(e=>e.subject))))].sort();
-      const tm=new Date(); tm.setDate(tm.getDate()+1);
-      h+=`<form class="form" id="ownform">
-        <label>Mihin mennessä<input type="date" name="date" required value="${isoOf(tm)}"></label>
-        <label>Aine<input name="subject" list="subs" required placeholder="esim. Matematiikka" autocomplete="off"></label>
-        <datalist id="subs">${subs.map(x=>`<option value="${esc(x)}">`).join("")}</datalist>
-        <label>Aihe<textarea name="text" required placeholder="Mitä pitää tehdä?"></textarea></label>
-        <div class="btns"><button type="button" class="cancel" id="owncancel">Peru</button><button type="submit" class="save">Tallenna</button></div>
-      </form>`;
-    } else {
-      h+=`<button class="add-btn" id="addown">+ Lisää oma tehtävä</button>`;
-    }
-    if(own.length){
-      h+=`<h2>Omat tehtävät</h2>`;
-      own.forEach(o=>{
-        const d=isDone(o), late=!d&&diffDays(o.date)<0;
-        h+=`<div class="item${d?" done":""}" data-own="${o.id}" role="checkbox" aria-checked="${d}"><div class="hwrow"><span class="check">${d?"✓":""}</span><div><div class="subj">${esc(o.subject)}<span class="badge">oma</span></div><div class="due${late?" late":""}">${dueText(o.date)}</div><div class="hw">${esc(o.text)}</div></div></div><button class="del" data-del="${o.id}">Poista</button></div>`;
-      });
-    }
-    h+=`<h2>Wilmasta – ${DATA.days||5} viimeistä koulupäivää</h2>`;
-    if(!k.homework.length) h+=`<div class="empty">Ei merkittyjä läksyjä.</div>`;
+    h+=`<h2>${DATA.days||5} viimeistä koulupäivää</h2>`;
+    if(!hws.length) h+=`<div class="empty">Ei merkittyjä läksyjä.</div>`;
     let cur=null;
-    k.homework.forEach((x,j)=>{
+    hws.forEach((x,j)=>{
       if(x.date!==cur){ cur=x.date; h+=`<div class="day">${hwDay(x.date)}</div>`; }
       const d=isDone(x);
-      h+=`<div class="item${d?" done":""}" data-hw="${j}" role="checkbox" aria-checked="${d}"><div class="hwrow"><span class="check">${d?"✓":""}</span><div><div class="subj">${esc(x.subject)}</div><div class="hw">${esc(x.text)}</div></div></div></div>`;
+      h+=`<div class="item${d?" done":""}" data-hw="${j}" role="checkbox" aria-checked="${d}"><div class="hwrow"><span class="check">${d?"✓":""}</span><div><div class="subj">${esc(x.subject)}${x.own?OMA:""}</div><div class="hw">${esc(x.text)}</div></div></div>${x.own?delBtn(x.own):""}</div>`;
     });
-    if(k.homework.length||own.length) h+=`<div class="empty">Napauta tehtävää, kun se on tehty.</div>`;
+    if(hws.length) h+=`<div class="empty">Napauta läksyä, kun se on tehty.</div>`;
   }
   document.getElementById("main").innerHTML=h;
-  document.querySelectorAll("[data-hw]").forEach(el=>el.onclick=()=>toggleDone(k.homework[+el.dataset.hw]));
-  document.querySelectorAll("[data-own]").forEach(el=>el.onclick=()=>{ const o=own.find(x=>x.id===el.dataset.own); if(o) toggleDone(o); });
+  document.querySelectorAll("[data-hw]").forEach(el=>el.onclick=()=>toggleDone(hws[+el.dataset.hw]));
   document.querySelectorAll("[data-del]").forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); const o=own.find(x=>x.id===b.dataset.del);
     if(b.dataset.sure){ saveOwn(loadOwn().filter(x=>x.id!==b.dataset.del)); try{ if(o) localStorage.removeItem(hwKey(o)); }catch(e){} render(); }
     else { b.dataset.sure="1"; b.textContent="Napauta uudelleen poistaaksesi"; } });
   const ab=document.getElementById("addown"); if(ab) ab.onclick=()=>{ FORM=true; render(); const f=document.querySelector("#ownform [name=subject]"); if(f) f.focus(); };
   const oc=document.getElementById("owncancel"); if(oc) oc.onclick=()=>{ FORM=false; render(); };
-  const of=document.getElementById("ownform"); if(of) of.onsubmit=ev=>{ ev.preventDefault(); const fd=new FormData(of);
-    const o={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6), kid:kidKey(), date:fd.get("date"), subject:String(fd.get("subject")).trim(), text:String(fd.get("text")).trim()};
-    if(!o.date||!o.subject||!o.text) return;
-    const a=loadOwn(); a.push(o); saveOwn(a); FORM=false; render(); };
+  const of=document.getElementById("ownform");
+  if(of){
+    of.querySelectorAll("[name=type]").forEach(r=>r.onchange=()=>{
+      document.getElementById("datelbl").textContent=of.type.value==="koe"?"Koepäivä":"Päivä, jolloin läksy annettiin";
+      of.text.placeholder=of.type.value==="koe"?"Mitä kokeeseen tulee?":"Mitä pitää tehdä?"; });
+    of.onsubmit=ev=>{ ev.preventDefault(); const fd=new FormData(of);
+      const o={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6), kid:kidKey(), type:fd.get("type")==="koe"?"koe":"laksy", date:fd.get("date"), subject:String(fd.get("subject")).trim(), text:String(fd.get("text")).trim()};
+      if(!o.date||!o.subject||!o.text) return;
+      const a=loadOwn(); a.push(o); saveOwn(a); FORM=false; VIEW=o.type==="koe"?"kokeet":"laksyt"; render(); };
+  }
   document.querySelectorAll("#tabs button").forEach((b,j)=>b.setAttribute("aria-selected",j===KID));
   document.querySelectorAll("#seg button").forEach(b=>b.setAttribute("aria-selected",b.dataset.v===VIEW));
   try{ localStorage.setItem("koulu-lapsi",String(KID)); localStorage.setItem("koulu-nakyma",VIEW); }catch(e){}
