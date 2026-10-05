@@ -53,6 +53,19 @@ h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute
 .item.done{opacity:.55}
 .item.done .check{background:var(--accent);border-color:var(--accent)}
 .item.done .hw{text-decoration:line-through}
+.add-btn{width:100%;padding:12px;border:1px dashed var(--accent);border-radius:12px;background:transparent;color:var(--accent);font:inherit;font-weight:700;cursor:pointer;margin:0 0 12px}
+.form{background:var(--card);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;margin:0 0 12px;display:grid;gap:10px}
+.form label{font-size:13px;color:var(--muted);display:grid;gap:4px}
+.form input,.form textarea{font:inherit;font-size:16px;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);width:100%}
+.form textarea{min-height:70px;resize:vertical}
+.form .btns{display:flex;gap:8px}
+.form .btns button{flex:1;padding:10px;border-radius:8px;font:inherit;font-weight:700;cursor:pointer;border:1px solid var(--accent)}
+.form .save{background:var(--accent);color:var(--bg)}
+.form .cancel{background:transparent;color:var(--accent)}
+.badge{display:inline-block;font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent);margin-left:6px;vertical-align:middle}
+.due{font-size:14px;color:var(--muted);margin-top:2px}
+.due.late{color:var(--warn);font-weight:700}
+.del{border:0;background:transparent;color:var(--muted);font:inherit;font-size:13px;text-decoration:underline;cursor:pointer;padding:4px 0 0;margin-left:40px}
 .empty{color:var(--muted);padding:8px 0}
 footer{margin-top:32px;font-size:13px;color:var(--muted)}
 .share{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px}
@@ -103,12 +116,27 @@ let VIEW="kokeet", KID=0;
 function hwKey(x){ let h=0; const t=x.date+"|"+x.subject+"|"+x.text; for(let i=0;i<t.length;i++) h=(h*31+t.charCodeAt(i))|0; return "koulu-tehty-"+h; }
 function isDone(x){ try{ return localStorage.getItem(hwKey(x))==="1"; }catch(e){ return false; } }
 function toggleDone(x){ try{ isDone(x)?localStorage.removeItem(hwKey(x)):localStorage.setItem(hwKey(x),"1"); }catch(e){} render(); }
+// Omat tehtävät: tallentuvat vain tälle laitteelle
+let FORM=false;
+function kidKey(){ return (DATA.kids[KID]||{}).name||String(KID); }
+function loadOwn(){ try{ return JSON.parse(localStorage.getItem("koulu-omat")||"[]"); }catch(e){ return []; } }
+function saveOwn(a){ try{ localStorage.setItem("koulu-omat",JSON.stringify(a)); }catch(e){} }
+function ownForKid(){
+  // tehdyt omat tehtävät katoavat viikon kuluttua määräpäivästä
+  const all=loadOwn(), keep=all.filter(o=>!(isDone(o)&&diffDays(o.date)<-7));
+  if(keep.length!==all.length) saveOwn(keep);
+  return keep.filter(o=>o.kid===kidKey()).sort((a,b)=>a.date.localeCompare(b.date));
+}
+function isoOf(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+function dueText(iso){ const n=diffDays(iso); if(n<0) return `Myöhässä (${short(iso)})`; if(n===0) return "Tänään"; if(n===1) return "Huomiseksi"; return `${short(iso)} mennessä`; }
+
 function render(i){
   if(i!==undefined) KID=i;
   const k=DATA.kids[KID];
   const exams=k.exams.filter(e=>diffDays(e.date)>=0);
   document.getElementById("seg-kokeet").textContent=`Kokeet (${exams.length})`;
-  const open=k.homework.filter(x=>!isDone(x)).length;
+  const own=ownForKid();
+  const open=k.homework.filter(x=>!isDone(x)).length+own.filter(o=>!isDone(o)).length;
   document.getElementById("seg-laksyt").textContent=open?`Läksyt (${open})`:`Läksyt ✓`;
   let h="";
   if(VIEW==="kokeet"){
@@ -120,7 +148,27 @@ function render(i){
         +(e.topic?`<div class="topic">${esc(e.topic)}</div>`:"")+`</div>`;
     }
   } else {
-    h+=`<h2>${DATA.days||5} viimeistä koulupäivää</h2>`;
+    if(FORM){
+      const subs=[...new Set(DATA.kids.flatMap(kk=>kk.homework.map(x=>x.subject).concat(kk.exams.map(e=>e.subject))))].sort();
+      const tm=new Date(); tm.setDate(tm.getDate()+1);
+      h+=`<form class="form" id="ownform">
+        <label>Mihin mennessä<input type="date" name="date" required value="${isoOf(tm)}"></label>
+        <label>Aine<input name="subject" list="subs" required placeholder="esim. Matematiikka" autocomplete="off"></label>
+        <datalist id="subs">${subs.map(x=>`<option value="${esc(x)}">`).join("")}</datalist>
+        <label>Aihe<textarea name="text" required placeholder="Mitä pitää tehdä?"></textarea></label>
+        <div class="btns"><button type="button" class="cancel" id="owncancel">Peru</button><button type="submit" class="save">Tallenna</button></div>
+      </form>`;
+    } else {
+      h+=`<button class="add-btn" id="addown">+ Lisää oma tehtävä</button>`;
+    }
+    if(own.length){
+      h+=`<h2>Omat tehtävät</h2>`;
+      own.forEach(o=>{
+        const d=isDone(o), late=!d&&diffDays(o.date)<0;
+        h+=`<div class="item${d?" done":""}" data-own="${o.id}" role="checkbox" aria-checked="${d}"><div class="hwrow"><span class="check">${d?"✓":""}</span><div><div class="subj">${esc(o.subject)}<span class="badge">oma</span></div><div class="due${late?" late":""}">${dueText(o.date)}</div><div class="hw">${esc(o.text)}</div></div></div><button class="del" data-del="${o.id}">Poista</button></div>`;
+      });
+    }
+    h+=`<h2>Wilmasta – ${DATA.days||5} viimeistä koulupäivää</h2>`;
     if(!k.homework.length) h+=`<div class="empty">Ei merkittyjä läksyjä.</div>`;
     let cur=null;
     k.homework.forEach((x,j)=>{
@@ -128,10 +176,20 @@ function render(i){
       const d=isDone(x);
       h+=`<div class="item${d?" done":""}" data-hw="${j}" role="checkbox" aria-checked="${d}"><div class="hwrow"><span class="check">${d?"✓":""}</span><div><div class="subj">${esc(x.subject)}</div><div class="hw">${esc(x.text)}</div></div></div></div>`;
     });
-    if(k.homework.length) h+=`<div class="empty">Napauta läksyä, kun se on tehty.</div>`;
+    if(k.homework.length||own.length) h+=`<div class="empty">Napauta tehtävää, kun se on tehty.</div>`;
   }
   document.getElementById("main").innerHTML=h;
   document.querySelectorAll("[data-hw]").forEach(el=>el.onclick=()=>toggleDone(k.homework[+el.dataset.hw]));
+  document.querySelectorAll("[data-own]").forEach(el=>el.onclick=()=>{ const o=own.find(x=>x.id===el.dataset.own); if(o) toggleDone(o); });
+  document.querySelectorAll("[data-del]").forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); const o=own.find(x=>x.id===b.dataset.del);
+    if(b.dataset.sure){ saveOwn(loadOwn().filter(x=>x.id!==b.dataset.del)); try{ if(o) localStorage.removeItem(hwKey(o)); }catch(e){} render(); }
+    else { b.dataset.sure="1"; b.textContent="Napauta uudelleen poistaaksesi"; } });
+  const ab=document.getElementById("addown"); if(ab) ab.onclick=()=>{ FORM=true; render(); const f=document.querySelector("#ownform [name=subject]"); if(f) f.focus(); };
+  const oc=document.getElementById("owncancel"); if(oc) oc.onclick=()=>{ FORM=false; render(); };
+  const of=document.getElementById("ownform"); if(of) of.onsubmit=ev=>{ ev.preventDefault(); const fd=new FormData(of);
+    const o={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6), kid:kidKey(), date:fd.get("date"), subject:String(fd.get("subject")).trim(), text:String(fd.get("text")).trim()};
+    if(!o.date||!o.subject||!o.text) return;
+    const a=loadOwn(); a.push(o); saveOwn(a); FORM=false; render(); };
   document.querySelectorAll("#tabs button").forEach((b,j)=>b.setAttribute("aria-selected",j===KID));
   document.querySelectorAll("#seg button").forEach(b=>b.setAttribute("aria-selected",b.dataset.v===VIEW));
   try{ localStorage.setItem("koulu-lapsi",String(KID)); localStorage.setItem("koulu-nakyma",VIEW); }catch(e){}
@@ -163,7 +221,7 @@ function shareButtons(names){
   let wi=0; while(words.length>1 && wi<5 && new Set(words.map(w=>w[wi])).size<words.length) wi++;
   DATA.kids.forEach((k,i)=>{
     const b=document.createElement("button"); b.role="tab"; b.textContent=words[i][wi]||k.name;
-    b.onclick=()=>render(i); tabs.appendChild(b);
+    b.onclick=()=>{ FORM=false; render(i); }; tabs.appendChild(b);
   });
   // Iso päivitysleima: vihreä = tuore, oranssi = yli 3 h vanha
   const u=new Date(DATA.updated), hh=String(u.getHours()).padStart(2,"0"), mm=String(u.getMinutes()).padStart(2,"0");
@@ -174,7 +232,7 @@ function shareButtons(names){
   const ago=ageH<1?`${Math.max(1,Math.round(ageH*60))} min sitten`:ageH<48?`${Math.round(ageH)} h sitten`:`${Math.round(ageH/24)} pv sitten`;
   document.getElementById("updated-sub").textContent=ageH>3?`${ago} – uusimmat merkinnät voivat puuttua, tarkista tarvittaessa Wilmasta`:ago;
   if(ageH>3) document.getElementById("status").classList.add("old");
-  document.querySelectorAll("#seg button").forEach(b=>b.onclick=()=>{ VIEW=b.dataset.v; render(); window.scrollTo(0,0); });
+  document.querySelectorAll("#seg button").forEach(b=>b.onclick=()=>{ VIEW=b.dataset.v; FORM=false; render(); window.scrollTo(0,0); });
   let s=0; try{ s=Number(localStorage.getItem("koulu-lapsi"))||0; VIEW=localStorage.getItem("koulu-nakyma")==="laksyt"?"laksyt":"kokeet"; }catch(e){}
   // ?lapsi=venla (nimen osa) tai ?lapsi=0
   const q=(new URLSearchParams(location.search).get("lapsi")||"").toLowerCase();
