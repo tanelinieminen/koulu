@@ -44,6 +44,9 @@ SALT=$(printf 'koulu-%s' "$SIVUN_SALASANA" | shasum -a 256 | cut -c1-32)
   --template-color-secondary "#f6f5f1" >/dev/null
 touch "$WORK/site/.nojekyll"
 
+# Tulevat kokeet salattuna Harjoittelu-sovellukselle (epäonnistuminen ei estä julkaisua)
+KOKEET_AVAIN="$SIVUN_SALASANA" "$APP/venv/bin/python" vie_kokeet.py "$WORK/data.json" "$WORK/site/kokeet.json" || echo "Kokeiden vienti epäonnistui"
+
 # Julkaisu: gh-pages-haarassa on aina vain yksi commit (ei kasvavaa historiaa)
 cd "$WORK/site"
 git init -q -b gh-pages
